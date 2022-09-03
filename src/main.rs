@@ -1,8 +1,8 @@
-use miden_assembly::Assembler;
-use miden::{Program, ProgramInputs, ProofOptions, StarkProof};
 use anyhow::Result;
-use std::time::Instant;
 use clap::Clap;
+use miden::{Program, ProgramInputs, ProofOptions, StarkProof};
+use miden_assembly::Assembler;
+use std::time::Instant;
 
 #[derive(Debug, Clap)]
 pub struct ExampleOptions {
@@ -10,6 +10,8 @@ pub struct ExampleOptions {
     //sequence_length: usize,
     #[clap(short = "s", long = "security", default_value = "96bits")]
     security: String,
+    #[clap(short = "f", default_value = "0")]
+    flag: u64,
 }
 
 pub fn get_example(flag: usize) -> Example {
@@ -24,27 +26,32 @@ pub fn get_example(flag: usize) -> Example {
     };
 
     let assembler = Assembler::new(true); //debug mode
-    // construct the program which either adds or multiplies two numbers
-    // based on the value provided via secret inputs
-    let program = assembler.compile(
-        "
+                                          // construct the program which either adds or multiplies two numbers
+                                          // based on the value provided via secret inputs
+    let program = assembler
+        .compile(
+            "
     begin
         push.3
         push.5
-        add
+        read
+        if.true
+            add
+        else
+            mul
+        end
     end",
-    )
-    .unwrap();
+        )
+        .unwrap();
 
     println!(
         "Generated a program to test conditional execution; expected result: {} for {}",
-        expected_result,
-        program,
+        expected_result, program,
     );
 
     Example {
         program,
-        inputs: ProgramInputs::new(&[], &[], vec![]).unwrap(),
+        inputs: ProgramInputs::new(&[], &[flag], vec![]).unwrap(),
         pub_inputs: vec![],
         expected_result: vec![expected_result],
         num_outputs: 1,
@@ -69,7 +76,6 @@ impl ExampleOptions {
     }
 
     pub fn execute(&self) -> Result<()> {
-
         println!("============================================================");
 
         let proof_options = self.get_proof_options();
@@ -80,8 +86,17 @@ impl ExampleOptions {
             num_outputs,
             pub_inputs,
             expected_result,
-        } = get_example(1);
+        } = get_example(self.flag as usize);
         println!("--------------------------------");
+
+        // debug
+        let trace = miden::execute(&program, &ProgramInputs::new(&[], &[self.flag], vec![]).unwrap()).unwrap();
+        for vm_state in miden::execute_iter(&program, &ProgramInputs::new(&[], &[self.flag], vec![]).unwrap()) {
+            match vm_state {
+                Ok(vm_state) => println!("{:?}", vm_state),
+                Err(_) => println!("something went terribly wrong!"),
+            }
+        }
 
         // execute the program and generate the proof of execution
         let now = Instant::now();
@@ -122,7 +137,31 @@ impl ExampleOptions {
     }
 }
 
+fn basic_example() {
+    //let args = ExampleOptions::parse();
+    //args.execute().unwrap();
+    // instantiate the assembler
+    let assembler = Assembler::default();
+
+    // this is our program, we compile it from assembly code
+    let program = assembler.compile("begin push.3 push.5 add swap drop end").unwrap();
+
+    // let's execute it and generate a STARK proof
+    let (outputs, proof) = miden::prove(
+        &program,
+        &ProgramInputs::none(),   // we won't provide any inputs
+        1,                        // we'll return one item from the stack
+        &ProofOptions::default(), // we'll be using default options
+    )
+    .unwrap();
+
+    // the output should be 8
+    assert_eq!(vec![8], outputs);
+}
+
 fn main() {
-    let args = ExampleOptions::parse();
-    args.execute().unwrap();
+    //basic_example();
+
+    let example_opts = ExampleOptions::parse();
+    example_opts.execute().unwrap();
 }
