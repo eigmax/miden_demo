@@ -8,6 +8,6 @@ edition = "2021"
 [dependencies]
 
 miden-assembly = { git = "https://github.com/maticnetwork/miden" }
-miden = { git = "https://github.com/maticnetwork/miden", version = "0.2.0"}
+miden = { git = "https://github.com/maticnetwork/miden" }
 anyhow = "1.0.33"
 clap = { package = "clap-v3", version = "3.0.0-beta.1" }

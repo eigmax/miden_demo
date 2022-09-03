@@ -34,12 +34,17 @@ pub fn get_example(flag: usize) -> Example {
     begin
         push.3
         push.5
-        read
+        push.1
+        push.10
+        gte
         if.true
             add
         else
             mul
         end
+        # keep stack size to 16
+        swap
+        drop
     end",
         )
         .unwrap();
